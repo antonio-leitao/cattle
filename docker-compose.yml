@@ -1,0 +1,89 @@
+services:
+  # ----------------------------------------------------------------
+  # 1. TRAEFIK (The Reverse Proxy)
+  # Routes web traffic (http://...) to the right container
+  # Dashboard: http://YOUR_IP:8080
+  # ----------------------------------------------------------------
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false" # Only expose containers with "traefik.enable=true"
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=true" # Dashboard on 8080
+    ports:
+      - "80:80" # The Web Port
+      - "8080:8080" # The Dashboard Port
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro" # Allows Traefik to see other containers
+    networks:
+      - proxy_net
+
+  # ----------------------------------------------------------------
+  # 2. ADGUARD HOME (DNS Server)
+  # Initial setup: http://YOUR_IP:3000
+  # After setup:   http://YOUR_IP:80 (or via Traefik)
+  # ----------------------------------------------------------------
+  adguard:
+    image: adguard/adguardhome
+    container_name: adguard
+    restart: unless-stopped
+    # NETWORK MODE: HOST
+    # AdGuard needs to see the real IP of devices asking for DNS.
+    # We do NOT use 'ports' here; it takes Port 53 directly from the host.
+    network_mode: host
+    volumes:
+      # CONFIG PERSISTENCE:
+      # Your DNS Rewrites (myserver.lan -> IP) live in these folders.
+      - ~/docker_data/adguard/work:/opt/adguardhome/work
+      - ~/docker_data/adguard/conf:/opt/adguardhome/conf
+
+  # ----------------------------------------------------------------
+  # 3. IMMICH (Photo Management)
+  # Access via: http://images.${DOMAIN}
+  # ----------------------------------------------------------------
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich_server
+    volumes:
+      - ~/docker_data/immich:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    env_file: .env
+    networks:
+      - proxy_net # To talk to Traefik
+      - internal_net # To talk to DB/Redis
+    depends_on:
+      - redis
+      - database
+    labels:
+      # --- TRAEFIK CONFIGURATION ---
+      # 1. Turn it on
+      - "traefik.enable=true"
+      # 2. Define the URL (The "Name")
+      - "traefik.http.routers.immich.rule=Host(`images.myserver.lan`)"
+      # 3. Define the internal port (The "Door")
+      - "traefik.http.services.immich.loadbalancer.server.port=2283"
+      # 4. Use the standard web entrypoint
+      - "traefik.http.routers.immich.entrypoints=web"
+
+  redis:
+    image: redis:6.2-alpine
+    restart: always
+    networks:
+      - internal_net
+
+  database:
+    image: postgres:14-alpine
+    container_name: immich_postgres
+    env_file: .env
+    volumes:
+      - ~/docker_data/postgres:/var/lib/postgresql/data
+    networks:
+      - internal_net
+
+networks:
+  proxy_net:
+    external: true # Shared with Traefik
+  internal_net: # Private for backend communication
