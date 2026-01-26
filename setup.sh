@@ -6,19 +6,23 @@
 set -e # Exit immediately if a command exits with a non-zero status
 
 # --- Configuration ---
-REPO_URL="https://github.com/antonio-leitao/cattle.git" 
+REPO_URL="https://github.com/antonio-leitao/cattle.git"
 REPO_DIR="/home/${SUDO_USER:-$USER}/server"
 DATA_DIR="/home/${SUDO_USER:-$USER}/docker_data"
+
+# Make apt non-interactive (no prompts)
+export DEBIAN_FRONTEND=noninteractive
+APT_OPTS="-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
 
 echo "============================================"
 echo "   Home Server Setup Script"
 echo "============================================"
 
 echo ">>> 1. Updating System Packages..."
-apt-get update && apt-get upgrade -y
+apt-get update && apt-get upgrade -y $APT_OPTS
 
 echo ">>> 2. Installing Essentials..."
-apt-get install -y curl git htop ncdu ufw openssh-server avahi-daemon ca-certificates
+apt-get install -y $APT_OPTS curl git htop ncdu ufw openssh-server avahi-daemon ca-certificates
 
 echo ">>> 3. Configuring Firewall..."
 ufw allow ssh
@@ -31,7 +35,7 @@ echo "NOTE: Run 'sudo ufw enable' manually after verifying SSH works!"
 
 echo ">>> 4. Installing Docker..."
 # Remove old/conflicting packages that might interfere
-apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
+apt-get remove -y $APT_OPTS docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
 
 # Check if Docker is already properly installed with compose
 if docker compose version &> /dev/null; then
@@ -53,10 +57,14 @@ Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-    # Install Docker Engine + Compose plugin
+    # Install Docker Engine + Compose plugin (non-interactive)
     apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    apt-get install -y $APT_OPTS docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
+
+# Start Docker service (in case it didn't auto-start)
+systemctl start docker 2>/dev/null || true
+systemctl enable docker 2>/dev/null || true
 
 # Add user to docker group
 usermod -aG docker ${SUDO_USER:-$USER}
@@ -79,7 +87,7 @@ if [ -f /etc/systemd/resolved.conf ]; then
     printf "[Resolve]\nDNSStubListener=no" > /etc/systemd/resolved.conf.d/adguardhome.conf
     rm -f /etc/resolv.conf
     echo "nameserver 1.1.1.1" > /etc/resolv.conf
-    systemctl restart systemd-resolved
+    systemctl restart systemd-resolved 2>/dev/null || true
 fi
 
 echo ">>> 7. Creating Docker Network..."
