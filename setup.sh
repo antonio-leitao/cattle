@@ -6,7 +6,7 @@
 set -e # Exit immediately if a command exits with a non-zero status
 
 # --- Configuration ---
-REPO_URL="https://github.com/YOURUSERNAME/YOURREPO.git"  # <-- CHANGE THIS
+REPO_URL="https://github.com/antonio-leitao/cattle.git"
 REPO_DIR="/home/${SUDO_USER:-$USER}/server"
 DATA_DIR="/home/${SUDO_USER:-$USER}/docker_data"
 

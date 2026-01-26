@@ -5,7 +5,7 @@ A single-command setup for a home server running Immich (photos), AdGuard (DNS),
 ## Quick Start (After OS Install)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/main/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/master/setup.sh | sudo bash
 ```
 
 Then reboot, edit `.env`, and run `./update.sh`. That's it.
@@ -43,7 +43,7 @@ ssh youruser@192.168.1.50
 ### Phase 3: Run Setup
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/main/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/master/setup.sh | sudo bash
 ```
 
 Then **reboot** to apply Docker group permissions:
