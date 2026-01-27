@@ -62,7 +62,7 @@ services:
       # 1. Turn it on
       - "traefik.enable=true"
       # 2. Define the URL (The "Name")
-      - "traefik.http.routers.immich.rule=Host(`images.myserver.lan`)"
+      - "traefik.http.routers.immich.rule=Host(`images.${DOMAIN}`)"
       # 3. Define the internal port (The "Door")
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
       # 4. Use the standard web entrypoint
