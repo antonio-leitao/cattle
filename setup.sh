@@ -23,7 +23,8 @@ apt-get install -y --no-install-recommends curl git ca-certificates openssh-serv
 
 echo ">>> 3. Installing Docker..."
 # Remove any old/conflicting packages
-apt-get remove -y docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc 2>/dev/null || true
+apt-get install -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold \
+    docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Check if Docker is already installed
 if docker compose version &> /dev/null; then
