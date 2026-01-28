@@ -1,6 +1,12 @@
+#
+# Home Lab Server - Docker Compose
+# Traefik + AdGuard Home + Immich
+#
+
 services:
   # ----------------------------------------------------------------
-  # 1. TRAEFIK (The Reverse Proxy)
+  # 1. TRAEFIK (Reverse Proxy)
+  # Dashboard: http://YOUR_IP:8080
   # ----------------------------------------------------------------
   traefik:
     image: traefik:v3.0
@@ -9,6 +15,7 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy_net"
       - "--entrypoints.web.address=:80"
       - "--api.insecure=true"
     ports:
@@ -21,6 +28,8 @@ services:
 
   # ----------------------------------------------------------------
   # 2. ADGUARD HOME (DNS Server)
+  # Initial setup: http://YOUR_IP:3000
+  # After setup:   http://YOUR_IP (admin panel moves to port you set)
   # ----------------------------------------------------------------
   adguard:
     image: adguard/adguardhome
@@ -33,56 +42,78 @@ services:
 
   # ----------------------------------------------------------------
   # 3. IMMICH (Photo Management)
+  # Access via: http://images.${DOMAIN}
+  # Based on official Immich docker-compose (Jan 2025)
   # ----------------------------------------------------------------
   immich-server:
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     container_name: immich_server
     restart: unless-stopped
     volumes:
-      - ~/docker_data/immich:/usr/src/app/upload
+      - ${UPLOAD_LOCATION}:/data
       - /etc/localtime:/etc/localtime:ro
-    env_file: .env
-    networks:
-      - proxy_net
-      - internal_net
+    env_file:
+      - .env
     depends_on:
       - redis
       - database
+    networks:
+      - proxy_net
+      - internal_net
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.immich.rule=Host(`images.${DOMAIN}`)"
       - "traefik.http.routers.immich.entrypoints=web"
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
-      # Specify which network Traefik should use
       - "traefik.docker.network=proxy_net"
+    healthcheck:
+      disable: false
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
+    container_name: immich_machine_learning
+    restart: unless-stopped
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    networks:
+      - internal_net
+    healthcheck:
+      disable: false
 
   redis:
-    image: redis:6.2-alpine
+    image: docker.io/valkey/valkey:9-bookworm
     container_name: immich_redis
     restart: unless-stopped
+    networks:
+      - internal_net
     healthcheck:
       test: redis-cli ping || exit 1
-    networks:
-      - internal_net
 
   database:
-    image: docker.io/tensorchord/pgvecto-rs:pg14-v0.2.0
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     container_name: immich_postgres
     restart: unless-stopped
-    env_file: .env
     environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
       POSTGRES_INITDB_ARGS: "--data-checksums"
     volumes:
-      - ~/docker_data/postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: pg_isready --dbname='${DB_DATABASE_NAME}' --username='${DB_USERNAME}' || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # NOTE: This directory must be owned by UID 999 (postgres user inside container)
+      # Run: sudo chown -R 999:999 ~/docker_data/postgres
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
     networks:
       - internal_net
+    healthcheck:
+      disable: false
 
 networks:
   proxy_net:
     external: true
   internal_net:
+
+volumes:
+  model-cache:
