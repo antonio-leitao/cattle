@@ -1,4 +1,4 @@
-# My Home Lab Server
+# cattle.server
 
 A single-command setup for a home server running Immich (photos), AdGuard (DNS), and Traefik (reverse proxy).
 
