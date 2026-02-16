@@ -103,7 +103,7 @@ services:
       disable: false
 
   redis:
-    image: docker.io/valkey/valkey:9-bookworm
+    image: docker.io/valkey/valkey:8-bookworm
     container_name: immich_redis
     restart: unless-stopped
     networks:
