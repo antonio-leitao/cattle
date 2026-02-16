@@ -160,10 +160,12 @@ mkdir -p "$DATA_DIR/adguard/work"
 mkdir -p "$DATA_DIR/adguard/conf"
 mkdir -p "$DATA_DIR/immich"
 mkdir -p "$DATA_DIR/postgres"
+mkdir -p "$DATA_DIR/glance"
 
 # Set ownership for user-accessible directories
 chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/adguard"
 chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/immich"
+chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/glance"
 
 # IMPORTANT: PostgreSQL container runs as UID 999 (postgres user)
 # The postgres directory must be owned by this UID or it will fail with permission denied
