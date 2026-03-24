@@ -20,7 +20,7 @@ Then configure AdGuard at `http://YOUR_IP:3000`.
 | ---------------- | ----------------------------------------------------- | -------------------------------- |
 | **Traefik**      | Reverse proxy - routes `*.myserver.lan` to containers | Dashboard: `http://YOUR_IP:8080` |
 | **AdGuard Home** | DNS server - blocks ads, handles local DNS            | Setup: `http://YOUR_IP:3000`     |
-| **Immich**       | Photo management - Google Photos alternative          | `http://images.myserver.lan`     |
+| **Immich**       | Photo management - Google Photos alternative          | `http://photos.myserver.lan`     |
 
 ---
 
@@ -99,9 +99,27 @@ nano .env
    | ---------------- | -------------- |
    | `*.myserver.lan` | `192.168.1.50` |
 
-5. **Configure your network to use AdGuard DNS**:
-   - **Option A** (Recommended): Set router's DHCP DNS to `192.168.1.50`
-   - **Option B**: Set DNS manually on each device
+### Phase 6: Configure Network DNS
+
+This is the most important step. All devices on your network must use AdGuard as their DNS server, or they won't be able to reach your services by name.
+
+1. **Set router DHCP DNS** to your server IP (`192.168.1.50`):
+   - Open router admin
+   - Find DHCP settings → DNS Server
+   - Set **only** your server IP as DNS — no fallback (if a secondary DNS like `8.8.8.8` is listed, some devices will use it instead and skip AdGuard entirely)
+   - Save and reboot router
+
+2. **Disable Private DNS on phones** (modern phones bypass local DNS by default):
+   - **Android**: Settings → Network & Internet → Private DNS → set to **Off**
+   - **iPhone**: Settings → Wi-Fi → tap your network → disable **Limit IP Address Tracking**. Also: Settings → Apple ID → iCloud → **Private Relay** → Off (if using iCloud+)
+
+3. **Reconnect Wi-Fi** on every device (toggle airplane mode or forget/rejoin the network) so they pick up the new DNS settings
+
+4. **Verify it works** from any device:
+   ```bash
+   nslookup photos.myserver.lan
+   # Should return 192.168.1.50
+   ```
 
 ---
 
@@ -109,7 +127,7 @@ nano .env
 
 | Service           | URL                        | Notes            |
 | ----------------- | -------------------------- | ---------------- |
-| Immich            | http://images.myserver.lan | After DNS setup  |
+| Immich            | http://photos.myserver.lan | After DNS setup  |
 | Traefik Dashboard | http://192.168.1.50:8080   | Direct IP access |
 | AdGuard Admin     | http://192.168.1.50:3000   | Direct IP access |
 
@@ -174,7 +192,25 @@ Then add DNS rewrite in AdGuard for `myapp.myserver.lan → 192.168.1.50`.
 
 ## Troubleshooting
 
-### Can't access `*.myserver.lan` URLs?
+### Can't access `*.myserver.lan` from phones?
+
+This is almost always a DNS issue. Modern phones aggressively use their own DNS, bypassing your local setup.
+
+1. **Check Private DNS is off** (this is the #1 cause):
+   - Android: Settings → Network → Private DNS → Off
+   - iPhone: Disable Private Relay and Limit IP Address Tracking
+
+2. **Check your router DHCP** only lists your server IP as DNS — no secondary DNS
+
+3. **Reconnect Wi-Fi** after any DNS change (airplane mode toggle works)
+
+4. **Test DNS directly**:
+   ```bash
+   nslookup photos.myserver.lan 192.168.1.50
+   ```
+   If this works but the browser doesn't, the device isn't using AdGuard as its DNS.
+
+### Can't access `*.myserver.lan` from desktop/laptop?
 
 1. Check your device is using AdGuard as DNS:
 
@@ -184,7 +220,7 @@ Then add DNS rewrite in AdGuard for `myapp.myserver.lan → 192.168.1.50`.
    # Should show 192.168.1.50
 
    # Or test directly
-   nslookup images.myserver.lan 192.168.1.50
+   nslookup photos.myserver.lan 192.168.1.50
    ```
 
 2. Verify AdGuard DNS Rewrite is configured

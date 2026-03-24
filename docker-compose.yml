@@ -41,28 +41,8 @@ services:
       - ~/docker_data/adguard/conf:/opt/adguardhome/conf
 
   # ----------------------------------------------------------------
-  # 3. GLANCE (Dashboard)
-  # Access via: http://home.${DOMAIN}
-  # Config:     ~/docker_data/glance/glance.yml
-  # ----------------------------------------------------------------
-  glance:
-    image: glanceapp/glance
-    container_name: glance
-    restart: unless-stopped
-    volumes:
-      - ~/docker_data/glance:/app/config:rw
-      - /etc/localtime:/etc/localtime:ro
-    networks:
-      - proxy_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.glance.rule=Host(`home.${DOMAIN}`)"
-      - "traefik.http.routers.glance.entrypoints=web"
-      - "traefik.http.services.glance.loadbalancer.server.port=8080"
-      - "traefik.docker.network=proxy_net"
-  # ----------------------------------------------------------------
-  # 4. IMMICH (Photo Management)
-  # Access via: http://images.${DOMAIN}
+  # 3. IMMICH (Photo Management)
+  # Access via: http://photos.${DOMAIN}
   # Based on official Immich docker-compose (Jan 2025)
   # ----------------------------------------------------------------
   immich-server:
@@ -82,7 +62,7 @@ services:
       - internal_net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.immich.rule=Host(`images.${DOMAIN}`)"
+      - "traefik.http.routers.immich.rule=Host(`photos.${DOMAIN}`)"
       - "traefik.http.routers.immich.entrypoints=web"
       - "traefik.http.services.immich.loadbalancer.server.port=2283"
       - "traefik.docker.network=proxy_net"

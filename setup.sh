@@ -160,12 +160,10 @@ mkdir -p "$DATA_DIR/adguard/work"
 mkdir -p "$DATA_DIR/adguard/conf"
 mkdir -p "$DATA_DIR/immich"
 mkdir -p "$DATA_DIR/postgres"
-mkdir -p "$DATA_DIR/glance"
 
 # Set ownership for user-accessible directories
 chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/adguard"
 chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/immich"
-chown -R "$ACTUAL_USER":"$ACTUAL_USER" "$DATA_DIR/glance"
 
 # IMPORTANT: PostgreSQL container runs as UID 999 (postgres user)
 # The postgres directory must be owned by this UID or it will fail with permission denied
@@ -245,6 +243,11 @@ echo "     Open ${YELLOW}http://YOUR_IP:3000${NC} in browser"
 echo "     - Set admin interface to port 3000"
 echo "     - Set DNS to port 53"
 echo "     - Add DNS rewrite: *.${DOMAIN:-myserver.lan} -> YOUR_IP"
+echo ""
+echo "  6. Configure your router's DHCP to use YOUR_IP as the"
+echo "     ONLY DNS server (no fallback). Then on each phone:"
+echo "     - Android: Settings > Network > Private DNS > Off"
+echo "     - iPhone:  Settings > Wi-Fi > your network > Limit IP Tracking > Off"
 echo ""
 echo "Your data directory: $DATA_DIR"
 echo "============================================"

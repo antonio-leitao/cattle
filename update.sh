@@ -93,6 +93,6 @@ echo "Access your services:"
 echo "  Traefik Dashboard: http://$IP:8080"
 echo "  AdGuard Setup:     http://$IP:3000"
 if [ -n "$DOMAIN" ]; then
-    echo "  Immich:            http://images.$DOMAIN (after DNS setup)"
+    echo "  Immich:            http://photos.$DOMAIN (after DNS setup)"
 fi
 echo "============================================"
