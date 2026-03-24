@@ -68,6 +68,8 @@ services:
       - "traefik.docker.network=proxy_net"
     healthcheck:
       disable: false
+    ports:
+      - "2283:2283"
 
   immich-machine-learning:
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}
