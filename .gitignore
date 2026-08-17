@@ -1,0 +1,16 @@
+# Secrets and generated runtime state
+.env
+.runtime/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Local logs and backups
+*.log
+*.sql.gz

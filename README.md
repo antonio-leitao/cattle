@@ -1,329 +1,226 @@
-# My Home Lab Server
+# Minimal Immich Home Server
 
-A single-command setup for a home server running **Immich** (photos), **AdGuard Home** (DNS), and **Traefik** (reverse proxy) on Ubuntu Server 24.04 LTS.
+This repository installs and operates one thing: **Immich on a trusted home LAN**.
 
-## Quick Start
+It deliberately does not run AdGuard, Traefik, a custom DNS domain, or any other service that could make the rest of the home network depend on this machine. If the server stops, Immich stops; normal internet and Wi-Fi continue working.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/master/setup.sh | sudo bash
-sudo reboot
-cd ~/server && ./update.sh
+Immich is available directly at:
+
+```text
+http://SERVER_IP:2283
 ```
 
-Then configure AdGuard at `http://YOUR_IP:3000`.
+Fresh installations require no router DNS changes, port forwarding, or modem configuration. Migrating the previous AdGuard-based version requires one final router change to undo its old DNS setting; see the migration section.
 
----
+## Requirements
 
-## What This Sets Up
+- Ubuntu Server 24.04 LTS
+- A 64-bit `amd64` or `arm64` machine
+- At least 4 GiB RAM with machine learning disabled
+- At least 8 GiB RAM to enable machine learning
+- Local Linux storage for PostgreSQL; do not put the database on a network share
 
-| Service          | Purpose                                               | Access                           |
-| ---------------- | ----------------------------------------------------- | -------------------------------- |
-| **Traefik**      | Reverse proxy - routes `*.myserver.lan` to containers | Dashboard: `http://YOUR_IP:8080` |
-| **AdGuard Home** | DNS server - blocks ads, handles local DNS            | Setup: `http://YOUR_IP:3000`     |
-| **Immich**       | Photo management - Google Photos alternative          | `http://photos.myserver.lan`     |
+The manager automatically disables Immich machine learning below 8 GiB and applies conservative per-container memory limits while reserving RAM for Ubuntu and Docker. A runaway Immich process is contained or restarted before it can exhaust the host.
 
----
+## Fresh installation
 
-## Full Setup Guide
-
-### Phase 1: Install Ubuntu Server
-
-1. **Download** [Ubuntu Server 24.04 LTS](https://ubuntu.com/download/server)
-2. **Create bootable USB** with [Rufus](https://rufus.ie/) or [balenaEtcher](https://etcher.balena.io/)
-3. **Install Ubuntu Server**:
-   - Connect Ethernet
-   - Select "Ubuntu Server (minimized)" for smaller footprint
-   - ☑️ **Check "Install OpenSSH Server"** ← Critical!
-   - Create your user account
-4. **After first boot**, note your server's IP and MAC:
-   ```bash
-   ip addr show
-   # IP: Look for "inet 192.168.x.x" under eth0/enp*
-   # MAC: Look for "link/ether xx:xx:xx:xx:xx:xx"
-   ```
-5. **Set hostname** (optional):
-   ```bash
-   sudo hostnamectl set-hostname myserver
-   ```
-6. **Unplug monitor** - everything else is remote
-
-### Phase 2: Reserve Static IP (Router)
-
-Your server needs a fixed IP. Configure your router:
-
-1. Open router admin (usually `192.168.1.1`)
-2. Find **DHCP Reservation** / **Static Lease** / **Address Reservation**
-3. Add entry:
-   - MAC Address: `xx:xx:xx:xx:xx:xx` (from Phase 1)
-   - IP Address: `192.168.1.50` (or your choice)
-4. Save and reboot router if needed
-
-### Phase 3: Run Setup Script
-
-From your laptop/desktop:
+Install Git, clone this repository, and run the single manager:
 
 ```bash
-# Connect to server
-ssh youruser@192.168.1.50
-
-# Run setup (as your user, with sudo)
-curl -fsSL https://raw.githubusercontent.com/antonio-leitao/cattle/master/setup.sh | sudo bash
-
-# IMPORTANT: Reboot to apply Docker permissions
-sudo reboot
-```
-
-### Phase 4: Start Services
-
-```bash
-ssh youruser@192.168.1.50
+sudo apt-get update
+sudo apt-get install -y git
+git clone https://github.com/antonio-leitao/cattle.git ~/server
 cd ~/server
-
-# Review settings (password was auto-generated)
-nano .env
-
-# Start everything
-./update.sh
+sudo ./server.sh install
 ```
 
-### Phase 5: Configure AdGuard Home
+The installation:
 
-1. Open `http://192.168.1.50:3000`
-2. **Setup Wizard**:
-   - Admin Interface: Keep port `3000` (80 is used by Traefik)
-   - DNS Server: Keep port `53`
-3. Create admin account
-4. **Add DNS Rewrite** (Settings → DNS Rewrites → Add):
+- Installs Docker Engine and the Docker Compose plugin when needed.
+- Does not perform an unattended full operating-system upgrade.
+- Generates a private `.env` file with a random PostgreSQL password.
+- Creates the Immich library and database directories.
+- Generates and validates the Docker Compose definition from `server.sh`.
+- Starts PostgreSQL, Valkey, Immich, and optionally Immich machine learning.
+- Waits up to five minutes for every enabled container to become healthy.
+- Enables rotated Docker logs and memory, swap, and PID limits.
+- Does not require a reboot. Docker group access becomes available on the next login.
 
-   | Domain           | Answer         |
-   | ---------------- | -------------- |
-   | `*.myserver.lan` | `192.168.1.50` |
+Open the URL printed by the installer. The first user registered on a new database becomes the Immich administrator.
 
-### Phase 6: Configure Network DNS
+## Migrating this repository's previous installation
 
-This is the most important step. All devices on your network must use AdGuard as their DNS server, or they won't be able to reach your services by name.
+The new setup preserves the paths already used by the old stack:
 
-1. **Set router DHCP DNS** to your server IP (`192.168.1.50`):
-   - Open router admin
-   - Find DHCP settings → DNS Server
-   - Set **only** your server IP as DNS — no fallback (if a secondary DNS like `8.8.8.8` is listed, some devices will use it instead and skip AdGuard entirely)
-   - Save and reboot router
-
-2. **Disable Private DNS on phones** (modern phones bypass local DNS by default):
-   - **Android**: Settings → Network & Internet → Private DNS → set to **Off**
-   - **iPhone**: Settings → Wi-Fi → tap your network → disable **Limit IP Address Tracking**. Also: Settings → Apple ID → iCloud → **Private Relay** → Off (if using iCloud+)
-
-3. **Reconnect Wi-Fi** on every device (toggle airplane mode or forget/rejoin the network) so they pick up the new DNS settings
-
-4. **Verify it works** from any device:
-   ```bash
-   nslookup photos.myserver.lan
-   # Should return 192.168.1.50
-   ```
-
----
-
-## Accessing Services
-
-| Service           | URL                        | Notes            |
-| ----------------- | -------------------------- | ---------------- |
-| Immich            | http://photos.myserver.lan | After DNS setup  |
-| Traefik Dashboard | http://192.168.1.50:8080   | Direct IP access |
-| AdGuard Admin     | http://192.168.1.50:3000   | Direct IP access |
-
-First user to register in Immich becomes admin.
-
----
-
-## File Structure
-
-```
-~/server/                    # Git-tracked config
-├── docker-compose.yml       # Service definitions
-├── .env                     # Your secrets (NOT in git)
-├── .env.example             # Template
-├── setup.sh                 # Initial setup script
-├── update.sh                # Update/restart script
-└── README.md
-
-~/docker_data/               # Persistent data (BACK THIS UP!)
-├── adguard/
-│   ├── conf/                # AdGuard configuration
-│   └── work/                # AdGuard working data
-├── immich/                  # Your photos and videos
-└── postgres/                # Database files
+```text
+~/docker_data/immich
+~/docker_data/postgres
 ```
 
----
+After switching to this version of the repository, run:
 
-## Updating
+1. Open the router's DHCP/DNS settings.
+2. Change DNS from the server's IP back to **Automatic**, the router itself, or the router's normal default.
+3. Reconnect household devices and verify that ordinary websites work while the server is disconnected or AdGuard is stopped.
+4. Run the guarded migration:
 
 ```bash
 cd ~/server
-./update.sh
+sudo ./server.sh install
 ```
 
-This pulls latest images and restarts containers.
+This one-time router reset is unavoidable because the previous setup deliberately made AdGuard the household's only DNS server. The installer detects the legacy AdGuard container and refuses to remove it until you type `YES` confirming that DNS has been restored. It validates the new stack and creates a database backup before removing either legacy service.
 
----
+During migration the manager:
 
-## Adding More Services
+- Keeps the existing `.env`, database password, library path, and database path.
+- Creates and verifies a PostgreSQL backup before changing existing containers.
+- Detects the running Immich major version and replaces the unsafe cross-major `IMMICH_VERSION=release` value with that major. It locally preserves the running images, so this migration does not double as a surprise Immich upgrade.
+- Removes the old AdGuard and Traefik containers.
+- Retains `~/docker_data/adguard` as a recoverable unused directory.
+- Restores Ubuntu's normal `systemd-resolved` configuration only when it finds the exact files created by the previous installer. Backups of those files are retained under `/etc`.
 
-Add to `docker-compose.yml`:
+The Immich account, albums, metadata, users, and photo library live in PostgreSQL and the Immich data directory—not in Traefik, AdGuard, or the URL. After migration, change the Immich mobile app's server endpoint to:
 
-```yaml
-myapp:
-  image: someimage:latest
-  container_name: myapp
-  restart: unless-stopped
-  networks:
-    - proxy_net
-  labels:
-    - "traefik.enable=true"
-    - "traefik.http.routers.myapp.rule=Host(`myapp.myserver.lan`)"
-    - "traefik.http.routers.myapp.entrypoints=web"
-    - "traefik.http.services.myapp.loadbalancer.server.port=8080"
-    - "traefik.docker.network=proxy_net"
+```text
+http://SERVER_IP:2283
 ```
 
-Then add DNS rewrite in AdGuard for `myapp.myserver.lan → 192.168.1.50`.
+The app may ask you to sign in again. It will reconnect to the same server-side account and data.
 
----
+If the Immich web page instead shows the first-time administrator setup, stop there and run `./server.sh doctor`; do not create a new administrator. That screen means the existing PostgreSQL data was not opened, rather than that the account was lost.
+
+## One command for every operation
+
+`server.sh` is the only operational source of truth. It embeds the Compose definition and generates `.runtime/docker-compose.yml`; do not edit that generated file.
+
+```bash
+./server.sh help
+```
+
+| Command | Purpose |
+| --- | --- |
+| `sudo ./server.sh install` | Install or repair the server and converge the stack without pulling surprise updates |
+| `./server.sh status` | Show health, OOM state, restart counts, live memory/CPU use, storage, and latest backup |
+| `./server.sh doctor` | Validate the script, environment, Docker, Compose, data paths, and Immich endpoint |
+| `./server.sh check-update` | Download newer configured images without changing running containers |
+| `sudo ./server.sh update` | Back up PostgreSQL, deploy downloaded/current images, and verify health |
+| `sudo ./server.sh backup` | Create and verify a compressed PostgreSQL dump |
+| `sudo ./server.sh start` | Start or reconcile the current pinned-major stack without pulling updates |
+| `sudo ./server.sh stop` | Gracefully stop Immich |
+| `sudo ./server.sh restart` | Recreate the stack and verify health |
+| `./server.sh logs` | Follow Immich server logs |
+| `./server.sh logs database` | Follow a specific Compose service's logs |
+
+After the first login following installation, your normal user can run the read-only commands without `sudo` because it belongs to the Docker group.
+
+## Safe updates
+
+Immich uses major-version tags. A fresh installation starts on `v3`; a migrated installation is pinned to the major version it was already running. Routine updates therefore cannot silently cross into another major version.
+
+Before updating:
+
+1. Read the [Immich release notes](https://github.com/immich-app/immich/releases).
+2. Check that the photo storage has at least 5 GiB free.
+3. Run the update check and then the explicit update:
+
+```bash
+./server.sh check-update
+sudo ./server.sh update
+```
+
+The update command refuses to proceed without a healthy PostgreSQL container, creates and verifies a database dump first, keeps old container images for diagnostics, and fails if the new stack does not become healthy. Immich does not support downgrades after database migrations, so release-note review and a real backup remain important.
+
+Changing major versions is intentionally manual. Follow Immich's release-specific migration notes, edit `IMMICH_VERSION` in `.env` only when ready, then run the explicit update command. Do not skip required intermediate migrations.
+
+## Backups
+
+Immich automatically creates database dumps in the library's `backups` directory. The manager can create an additional verified dump on demand:
+
+```bash
+sudo ./server.sh backup
+```
+
+A complete backup needs both:
+
+- `~/docker_data/immich` — originals, thumbnails, encoded video, profiles, and database dumps
+- A recent `.sql.gz` database dump from `~/docker_data/immich/backups`
+
+Copy them to storage outside this server. A second directory on the same disk is not a backup.
+
+The raw `~/docker_data/postgres` directory is runtime database storage; prefer the verified SQL dumps for recovery.
+
+## Resource containment
+
+The generated `.env` contains editable limits:
+
+```text
+ENABLE_MACHINE_LEARNING=true
+IMMICH_SERVER_MEMORY_LIMIT=2560m
+IMMICH_ML_MEMORY_LIMIT=1536m
+IMMICH_DB_MEMORY_LIMIT=2048m
+IMMICH_REDIS_MEMORY_LIMIT=256m
+```
+
+Defaults are selected from the machine's total RAM only when a setting does not already exist. Existing custom values are preserved.
+
+If the machine remains under pressure, set:
+
+```text
+ENABLE_MACHINE_LEARNING=false
+```
+
+Then run:
+
+```bash
+sudo ./server.sh start
+```
+
+Also reduce Immich job concurrency and video-transcoding threads from the Immich administration interface. Memory limits intentionally favor host survival over keeping a runaway container alive.
+
+Docker uses the rotating `local` logging driver for every service. A single noisy container therefore cannot grow an unlimited JSON log file.
+
+## Storage layout
+
+```text
+~/server/
+├── server.sh             # The only operational source file
+├── .env                  # Private generated settings; never committed
+└── .runtime/             # Generated Compose file; never committed
+
+~/docker_data/
+├── immich/               # Photo library and Immich-managed database dumps
+├── postgres/             # Live PostgreSQL files
+└── adguard/              # Unused legacy data retained after migration
+```
+
+## Networking and security
+
+- Port `2283` is published for LAN access.
+- PostgreSQL and Valkey are not published to the LAN.
+- Do not forward port `2283` to the internet.
+- HTTP is suitable only for a trusted home LAN.
+- For future remote access, use a private VPN such as WireGuard/Tailscale or deliberately add a properly configured HTTPS reverse proxy.
+- A future Jellyfin/Arr stack should be deployed as a separate, resource-limited project so media downloads or transcoding cannot exhaust Immich or the operating system.
 
 ## Troubleshooting
 
-### Can't access `*.myserver.lan` from phones?
-
-This is almost always a DNS issue. Modern phones aggressively use their own DNS, bypassing your local setup.
-
-1. **Check Private DNS is off** (this is the #1 cause):
-   - Android: Settings → Network → Private DNS → Off
-   - iPhone: Disable Private Relay and Limit IP Address Tracking
-
-2. **Check your router DHCP** only lists your server IP as DNS — no secondary DNS
-
-3. **Reconnect Wi-Fi** after any DNS change (airplane mode toggle works)
-
-4. **Test DNS directly**:
-   ```bash
-   nslookup photos.myserver.lan 192.168.1.50
-   ```
-   If this works but the browser doesn't, the device isn't using AdGuard as its DNS.
-
-### Can't access `*.myserver.lan` from desktop/laptop?
-
-1. Check your device is using AdGuard as DNS:
-
-   ```bash
-   # On Linux/Mac
-   cat /etc/resolv.conf
-   # Should show 192.168.1.50
-
-   # Or test directly
-   nslookup photos.myserver.lan 192.168.1.50
-   ```
-
-2. Verify AdGuard DNS Rewrite is configured
-3. Try flushing DNS cache on your device
-
-### Port 53 already in use?
-
-The setup script handles this, but if needed:
+Start with:
 
 ```bash
-sudo systemctl disable systemd-resolved
-sudo systemctl stop systemd-resolved
-echo "nameserver 1.1.1.1" | sudo tee /etc/resolv.conf
+./server.sh doctor
+./server.sh status
 ```
 
-### Docker permission denied?
-
-You need to reboot after running setup.sh:
+Then inspect logs:
 
 ```bash
-sudo reboot
+./server.sh logs
+./server.sh logs database
+./server.sh logs immich-machine-learning
 ```
 
-### Container won't start?
-
-```bash
-# Check logs
-docker compose logs -f immich-server
-docker compose logs -f database
-
-# Check if postgres has permission issues
-ls -la ~/docker_data/postgres/
-```
-
-### Immich shows database errors?
-
-The PostgreSQL container runs as UID 999 internally. If you see permission errors:
-
-```bash
-# Fix postgres directory ownership
-sudo chown -R 999:999 ~/docker_data/postgres
-
-# If that doesn't work, start fresh:
-docker compose down
-sudo rm -rf ~/docker_data/postgres/*
-sudo chown -R 999:999 ~/docker_data/postgres
-docker compose up -d
-```
-
-### Check container status
-
-```bash
-docker compose ps
-docker compose logs -f          # All logs
-docker compose logs -f immich-server  # Specific service
-```
-
----
-
-## Hardware Requirements
-
-| Component | Minimum              | Recommended      |
-| --------- | -------------------- | ---------------- |
-| RAM       | 4GB                  | 8GB+             |
-| CPU       | 2 cores              | 4 cores          |
-| Storage   | 32GB + photo storage | SSD for database |
-
-Immich ML features benefit significantly from more RAM and CPU.
-
----
-
-## Backup Strategy
-
-**Critical data to backup:**
-
-- `~/docker_data/immich/` - Your photos/videos
-- `~/docker_data/postgres/` - Database (metadata, users)
-- `~/docker_data/adguard/conf/` - DNS configuration
-- `~/server/.env` - Your secrets
-
-**Backup command example:**
-
-```bash
-# Stop services for consistent backup
-cd ~/server && docker compose down
-
-# Backup
-tar -czvf backup-$(date +%Y%m%d).tar.gz ~/docker_data ~/server/.env
-
-# Restart
-docker compose up -d
-```
-
----
-
-## Security Notes
-
-- Change default passwords in `.env`
-- AdGuard admin panel has no HTTPS by default (use VPN for remote access)
-- Consider firewall rules to restrict port 53 to local network only
-- Immich stores photos unencrypted - secure your server physically
-
----
+If the mobile app cannot connect after migration, verify that the phone is on the same Wi-Fi, that local-network permission is enabled for Immich, and that the endpoint is exactly `http://SERVER_IP:2283` without the old `photos.myserver.lan` name.
 
 ## License
 
