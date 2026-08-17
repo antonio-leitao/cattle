@@ -36,8 +36,18 @@ container_ready() {
     [[ "$state" == "running" && ( "$health" == "healthy" || "$health" == "none" ) ]]
 }
 
+server_ip() {
+    local ip
+    ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i=1; i<=NF; i++) if ($i == "src") { print $(i+1); exit } }' || true)"
+    [[ -n "$ip" ]] || ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+    printf '%s\n' "${ip:-SERVER_IP}"
+}
+
 printf 'Immich diagnostic report — %s\n' "$(date -Is)"
-printf 'Host: %s | Kernel: %s\n\n' "$(hostname)" "$(uname -r)"
+printf 'Host: %s | Kernel: %s\n' "$(hostname)" "$(uname -r)"
+printf '\n[service links]\n'
+printf '  Immich: http://%s:2283\n' "$(server_ip)"
+printf '  PostgreSQL, Valkey, and machine learning are internal only; they have no browser homepage.\n\n'
 
 printf '[installation]\n'
 if bash -n "$SCRIPT_DIR/server.sh"; then ok 'server.sh syntax'; else fail 'server.sh syntax'; fi

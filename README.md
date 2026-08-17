@@ -2,11 +2,15 @@
 
 This repository runs only **Immich on a trusted home LAN**. It does not run DNS, a reverse proxy, or anything else that can make household internet depend on this server.
 
-Immich is available at:
+## Quick links
 
-```text
-http://SERVER_IP:2283
-```
+Replace `SERVER_IP` with the server's LAN address. Running `./diagnose.sh` prints the current address automatically.
+
+| Service | Browser homepage |
+| --- | --- |
+| Immich | `http://SERVER_IP:2283` |
+
+PostgreSQL, Valkey, and Immich machine learning are internal supporting services. They intentionally have no LAN port or browser homepage.
 
 Do not forward port `2283` to the internet. Plain HTTP is appropriate only on the trusted LAN; use a private VPN for future remote access.
 
