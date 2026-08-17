@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-SCRIPT_VERSION="2.0.0"
+SCRIPT_VERSION="2.0.1"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 RUNTIME_DIR="$SCRIPT_DIR/.runtime"
@@ -377,7 +377,9 @@ container_ready() {
 }
 
 wait_for_container() {
-    local name=$1 label=$2 timeout=${3:-300} deadline=$((SECONDS + timeout))
+    local name=$1 label=$2 timeout deadline
+    timeout=${3:-300}
+    deadline=$((SECONDS + timeout))
     while (( SECONDS < deadline )); do
         if container_ready "$name"; then
             log_info "$label is healthy."
