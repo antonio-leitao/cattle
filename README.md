@@ -50,31 +50,6 @@ cd ~/server
 
 Fresh installations require no router changes, custom DNS, port forwarding, or reboot. The first user registered in a fresh Immich database becomes its administrator.
 
-## Temporary migration from the previous repository version
-
-`migrate.sh` exists only while the known Albatross installation is being migrated away from AdGuard and Traefik. All transition-specific recovery and cleanup is isolated there; neither permanent script contains migration logic.
-
-The router's DHCP/DNS setting must first be restored from Albatross to **Automatic/default** and normal browsing must be verified. Then run:
-
-```bash
-cd ~/server
-./migrate.sh
-```
-
-The migration tool:
-
-- Detects and preserves the exact installed Immich version.
-- Recreates only the broken legacy PostgreSQL container on the valid Docker network, without pulling an image.
-- Verifies that the existing database has tables and records its asset count.
-- Creates and verifies a pre-migration PostgreSQL dump.
-- Preserves a private copy of `.env`.
-- Invokes the permanent `server.sh` to deploy the minimal resource-limited stack.
-- Removes legacy AdGuard and Traefik containers only after the new stack is healthy.
-- Restores Ubuntu's normal `systemd-resolved` configuration while retaining backups.
-- Confirms the database counts did not unexpectedly change and runs the diagnostic report.
-
-After manually confirming the existing account, albums, and photos at `http://SERVER_IP:2283`, delete `migrate.sh` from the repository. If Immich ever presents first-time administrator setup during migration, stop and do not create a new account.
-
 ## Version policy
 
 `IMMICH_VERSION` in `.env` must be a major tag such as `v3` or an exact stable release such as `v3.1.0`. The unsafe moving `release` tag is rejected.
@@ -118,7 +93,7 @@ Then run `./server.sh`.
 
 Managed database dumps are written to `~/docker_data/immich/backups`. A complete external backup needs the entire Immich directory plus a recent verified `.sql.gz` dump. A copy on the same disk is not a backup.
 
-The database and library paths are preserved across updates. Changing the URL does not change an Immich account: after migration, set the mobile app endpoint to `http://SERVER_IP:2283` and sign in again if requested.
+The database and library paths are preserved across updates. Changing the URL does not change an Immich account: set the mobile app endpoint to `http://SERVER_IP:2283` and sign in again if requested.
 
 ## Generated files
 
@@ -126,7 +101,6 @@ The database and library paths are preserved across updates. Changing the URL do
 ~/server/
 ├── server.sh       # permanent one-command manager
 ├── diagnose.sh     # permanent optional read-only diagnostic
-├── migrate.sh      # temporary; removed after verified migration
 ├── .env            # private persistent settings
 └── .runtime/       # generated Compose definition
 ```
