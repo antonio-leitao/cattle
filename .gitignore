@@ -1,5 +1,6 @@
 # Secrets and generated runtime state
 .env
+.env.*
 .runtime/
 
 # OS and editor files
