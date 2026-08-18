@@ -24,15 +24,18 @@ Day-to-day installation, updates, repair, backups, and health verification are o
 
 There are no modes or subcommands to remember. The script asks for `sudo` itself and then:
 
-1. Checks Ubuntu, CPU architecture, RAM, Docker, configuration, and free space.
-2. Installs Docker on a fresh Ubuntu server when necessary.
-3. Repairs an existing PostgreSQL container before attempting an update.
-4. Creates and verifies a PostgreSQL dump whenever an existing database is present.
-5. Pulls only the configured Immich version or pinned major.
-6. Reconciles the generated Compose stack without touching unrelated containers.
-7. Waits for PostgreSQL, Valkey, Immich, and optional machine learning to become healthy.
-8. Keeps the latest 14 routine database dumps and removes only unused dangling container images after a healthy deployment.
-9. Prints the URL, container state, resource use, and storage state.
+1. Fast-forwards its Git checkout and reloads the updated script.
+2. Checks Ubuntu, CPU architecture, RAM, Docker, configuration, and free space.
+3. Installs Docker on a fresh Ubuntu server when necessary.
+4. Repairs an existing PostgreSQL container before attempting an update.
+5. Creates and verifies a PostgreSQL dump whenever an existing database is present.
+6. Pulls the latest stable release in the repository-managed Immich major.
+7. Reconciles the generated Compose stack without touching unrelated containers.
+8. Waits for PostgreSQL, Valkey, Immich, and optional machine learning to become healthy.
+9. Keeps the latest 14 routine database dumps and removes only unused dangling container images after a healthy deployment.
+10. Prints the URL, exact running version, container state, resource use, and storage state.
+
+If GitHub is temporarily unavailable, the script warns and continues with its installed copy. It refuses to overwrite tracked local changes or perform a non-fast-forward Git update.
 
 When something is wrong, the optional diagnostic is also one command:
 
@@ -56,9 +59,9 @@ Fresh installations require no router changes, custom DNS, port forwarding, or r
 
 ## Version policy
 
-`IMMICH_VERSION` in `.env` must be a major tag such as `v3` or an exact stable release such as `v3.1.0`. The unsafe moving `release` tag is rejected.
+The committed `server.sh` currently manages the stable `v3` line. Running it checks for repository changes and then pulls the latest stable v3 container images. The private `.env` is updated automatically and must not be edited to select an Immich version.
 
-Running `server.sh` updates within the configured major. Major-version changes are manual because they can have release-specific migration requirements and Immich does not support downgrades after database migrations. Read the [Immich release notes](https://github.com/immich-app/immich/releases) before changing the major in `.env`.
+Major-version changes are reviewed and committed to `server.sh` because they can have release-specific migration requirements and Immich does not support downgrades after database migrations. Read the [Immich release notes](https://github.com/immich-app/immich/releases) before changing `MANAGED_IMMICH_VERSION` in the repository.
 
 ## Resource containment
 
@@ -80,7 +83,7 @@ IMMICH_DB_MEMORY_LIMIT=3072m
 IMMICH_REDIS_MEMORY_LIMIT=256m
 ```
 
-Existing values in `.env` are preserved. To disable machine learning permanently, set:
+Existing machine-specific values in `.env` are preserved. To disable machine learning permanently, set:
 
 ```text
 ENABLE_MACHINE_LEARNING=false

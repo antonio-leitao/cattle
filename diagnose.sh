@@ -117,7 +117,8 @@ fi
 [[ -n "$latest" ]] && ok "latest verified backup: $latest" || warn 'no managed database backup found'
 
 printf '\n[network]\n'
-if curl -fsS --max-time 5 -o /dev/null http://127.0.0.1:2283/api/server/version; then ok 'Immich API responds on port 2283'; else fail 'Immich API unavailable on port 2283'; fi
+version="$(curl -fsS --max-time 5 http://127.0.0.1:2283/api/server/version 2>/dev/null || true)"
+if [[ -n "$version" ]]; then ok "Immich API responds on port 2283: $version"; else fail 'Immich API unavailable on port 2283'; fi
 
 if (( failures > 0 )); then
     printf '\nRESULT: %d failure(s), %d warning(s).\n' "$failures" "$warnings"

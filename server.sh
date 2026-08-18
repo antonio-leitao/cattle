@@ -4,7 +4,8 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-SCRIPT_VERSION="2.0.1"
+SCRIPT_VERSION="2.1.0"
+MANAGED_IMMICH_VERSION="v3"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 RUNTIME_DIR="$SCRIPT_DIR/.runtime"
@@ -30,13 +31,66 @@ on_error() {
 }
 trap 'on_error "$LINENO"' ERR
 
+repository_git() {
+    local owner
+    if [[ $EUID -ne 0 ]]; then
+        git -C "$SCRIPT_DIR" "$@"
+        return
+    fi
+    owner="$(stat -c '%U' "$SCRIPT_DIR")"
+    if [[ "$owner" != "root" && "$owner" != "UNKNOWN" ]]; then
+        runuser -u "$owner" -- git -C "$SCRIPT_DIR" "$@"
+    else
+        git -C "$SCRIPT_DIR" "$@"
+    fi
+}
+
+sync_repository() {
+    local before after
+    REPOSITORY_UPDATED=false
+
+    if ! command -v git >/dev/null 2>&1 || ! repository_git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log_warn "This is not a Git checkout; continuing without checking for script updates."
+        return
+    fi
+    if ! repository_git diff --quiet --ignore-submodules -- || ! repository_git diff --cached --quiet --ignore-submodules --; then
+        log_error "Tracked repository files have local changes; refusing to overwrite them."
+        log_error "Review them with: git -C $SCRIPT_DIR status"
+        exit 1
+    fi
+    if ! repository_git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+        log_warn "The current branch has no upstream; continuing without checking for script updates."
+        return
+    fi
+
+    before="$(repository_git rev-parse HEAD)"
+    log_info "Checking the server repository for updates..."
+    if ! repository_git pull --ff-only; then
+        log_warn "Could not update the repository; continuing with the installed script."
+        return
+    fi
+    after="$(repository_git rev-parse HEAD)"
+    if [[ "$before" != "$after" ]]; then
+        REPOSITORY_UPDATED=true
+        log_info "Server repository updated: ${before:0:7} -> ${after:0:7}"
+    else
+        log_info "Server repository is already current."
+    fi
+}
+
 if [[ "${SERVER_SCRIPT_LIB_ONLY:-0}" != 1 ]]; then
     if (( $# != 0 )); then
         log_error "server.sh takes no commands or arguments. Just run: ./server.sh"
         exit 2
     fi
+    if [[ "${SERVER_SCRIPT_REPOSITORY_SYNCED:-0}" != 1 ]]; then
+        sync_repository
+        if [[ $EUID -eq 0 && "$REPOSITORY_UPDATED" == true ]]; then
+            exec env SERVER_SCRIPT_REPOSITORY_SYNCED=1 "$SCRIPT_DIR/server.sh"
+        fi
+    fi
     if [[ $EUID -ne 0 ]]; then
-        exec sudo "$SCRIPT_DIR/server.sh"
+        exec sudo env SERVER_SCRIPT_REPOSITORY_SYNCED=1 "$SCRIPT_DIR/server.sh"
     fi
     exec 9>"$LOCK_FILE"
     if ! flock -n 9; then
@@ -177,7 +231,7 @@ prepare_environment() {
 UPLOAD_LOCATION=$home/docker_data/immich
 DB_DATA_LOCATION=$home/docker_data/postgres
 TZ=Europe/Rome
-IMMICH_VERSION=v3
+IMMICH_VERSION=$MANAGED_IMMICH_VERSION
 DB_PASSWORD=$password
 DB_USERNAME=postgres
 DB_DATABASE_NAME=immich
@@ -193,7 +247,6 @@ EOF
         ensure_env_key UPLOAD_LOCATION "$home/docker_data/immich"
         ensure_env_key DB_DATA_LOCATION "$home/docker_data/postgres"
         ensure_env_key TZ "Europe/Rome"
-        ensure_env_key IMMICH_VERSION "v3"
         ensure_env_key DB_PASSWORD "$(openssl rand -hex 24)"
         ensure_env_key DB_USERNAME postgres
         ensure_env_key DB_DATABASE_NAME immich
@@ -203,6 +256,11 @@ EOF
         ensure_env_key IMMICH_ML_MEMORY_LIMIT "$DEFAULT_ML_MEMORY"
         ensure_env_key IMMICH_DB_MEMORY_LIMIT "$DEFAULT_DB_MEMORY"
         ensure_env_key IMMICH_REDIS_MEMORY_LIMIT "$DEFAULT_REDIS_MEMORY"
+    fi
+
+    if [[ "$(env_get IMMICH_VERSION 2>/dev/null || true)" != "$MANAGED_IMMICH_VERSION" ]]; then
+        log_info "Applying the repository Immich version policy: $MANAGED_IMMICH_VERSION"
+        env_set IMMICH_VERSION "$MANAGED_IMMICH_VERSION"
     fi
 
     chmod 600 "$ENV_FILE"
@@ -463,8 +521,11 @@ server_ip() {
 }
 
 show_summary() {
+    local running_version
+    running_version="$(curl -fsS --max-time 5 http://127.0.0.1:2283/api/server/version)"
     printf '\n%bImmich is healthy:%b http://%s:2283\n' "$CYAN" "$NC" "$(server_ip)"
-    printf 'Version setting: %s | Machine learning: %s\n' "$(env_get IMMICH_VERSION)" "$(env_get ENABLE_MACHINE_LEARNING)"
+    printf 'Running version: %s | Managed line: %s | Machine learning: %s\n' \
+        "$running_version" "$(env_get IMMICH_VERSION)" "$(env_get ENABLE_MACHINE_LEARNING)"
     compose ps
     printf '\nResource use:\n'
     docker stats --no-stream --format '  {{.Name}}: {{.MemUsage}}, CPU {{.CPUPerc}}, PIDs {{.PIDs}}' \
