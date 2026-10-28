@@ -112,7 +112,7 @@ done
 upload="$(env_get UPLOAD_LOCATION 2>/dev/null || true)"
 latest=""
 if [[ -n "$upload" && -d "$upload/backups" ]]; then
-    latest="$(find "$upload/backups" -maxdepth 1 -type f -name 'immich-db-*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR == 1 {sub(/^[^ ]+ /, ""); print}')"
+    latest="$(find "$upload/backups" -maxdepth 1 -type f -name 'immich-db-[0-9]*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR == 1 {sub(/^[^ ]+ /, ""); print}')"
 fi
 [[ -n "$latest" ]] && ok "latest verified backup: $latest" || warn 'no managed database backup found'
 
