@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-SCRIPT_VERSION="2.1.1"
+SCRIPT_VERSION="2.1.2"
 MANAGED_IMMICH_VERSION="v3"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
@@ -484,13 +484,13 @@ prune_old_managed_backups() {
     local backup_dir file index remove_count
     local -a backups
     backup_dir="$(env_get UPLOAD_LOCATION)/backups"
-    [[ -d "$backup_dir" ]] || return
+    [[ -d "$backup_dir" ]] || return 0
     # The digit excludes Immich's own nightly immich-db-backup-* dumps in the same directory.
     shopt -s nullglob
     backups=("$backup_dir"/immich-db-[0-9]*.sql.gz)
     shopt -u nullglob
     remove_count=$((${#backups[@]} - 14))
-    (( remove_count > 0 )) || return
+    (( remove_count > 0 )) || return 0
     for ((index=0; index<remove_count; index++)); do
         file="${backups[$index]}"
         [[ "$file" == "$backup_dir"/immich-db-[0-9]*.sql.gz ]] || continue
